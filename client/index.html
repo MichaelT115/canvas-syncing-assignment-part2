@@ -1,13 +1,102 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <script src="https://npmcdn.com/babel-core@5.8.38/browser.min.js"></script>
-    <script type="text/babel" >
-        "use strict";
-    
-    </script>
-</head>
-<body>
 
+<head>
+    <!-- Will put the library into a JS global called io-->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://npmcdn.com/babel-core@5.8.38/browser.min.js"></script>
+    <script type="text/babel">
+        "use strict";
+        (() => {
+            // The socket connected to the server.
+            let socket;
+
+            let canvas;
+            let ctx;
+
+            // Holds the shapes to draw.
+            // Shape {x: 0, y: 0, radius: 0}
+            const shapes = {};
+
+            // Setup the canvas
+            const setupCanvas = () => {
+                canvas = document.querySelector('#canvas');
+                ctx = canvas.getContext('2d');
+
+                // Add Event Listener allowing user to click on the canvas to create shapes
+                canvas.addEventListener("mousedown", (e) => {
+                    // Make shape at position
+                    const xPos = e.x - canvas.offsetLeft;
+                    const yPos = e.y - canvas.offsetTop;
+                    let newShape = { x: xPos, y: yPos, radius: 15 };
+
+                    // Emit the shape to the server
+                    socket.emit('addShape', newShape);
+                });
+            };
+
+            // Redraws the canvas
+            const redrawCanvas = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draws each individual shape.
+                const keys = Object.keys(shapes);
+                for (let i = 0; i < keys.length; i += 1) {
+                    const shape = shapes[keys[i]];
+
+                    // Draw shape
+                    ctx.beginPath();
+                    ctx.arc(shape.x, shape.y, shape.radius, 0, 2 * Math.PI, false);
+                    ctx.fillStyle = shape.color;
+                    ctx.fill();
+                }
+            };
+
+            // Sets ip the socket.
+            const setupSocket = () => {
+                const serverMessageDiv = document.querySelector('#ServerMessageDisplay');
+
+                // Set for recieving messages from the server. 
+                socket.on('serverMessage', (data) => {
+                    const message = data.message;
+                    serverMessageDiv.innerHTML = message;
+
+                    // Remove message after 3 seconds.
+                    setTimeout(() => {
+                        serverMessageDiv.innerHTML = "";
+                    }, 3000);
+                });
+
+                // On the "addShape" message, add the shape to the list of shapes.
+                socket.on('addShape', (data) => {
+                    shapes[data.time] = data.shape;
+                    redrawCanvas(); // Redraw the canvas with new shapes.
+                });
+            }
+
+            const init = () => {
+                // Connect to socket.
+                socket = io.connect();
+                setupSocket();
+
+                // Handle Canvas
+                setupCanvas();
+            }
+
+            window.onload = init;
+        })(window);
+    </script>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <h2>Click on the Canvas to leave a shape</h2>
+    <div>
+        The coordinates will be sent to the server and broadcasted. <br> Your shapes are green, other client's shapes are
+        red.
+        <span id='ServerMessageDisplay'></span>
+    </div>
+    <canvas id="canvas" height="500" width="500">Please use an HTML 5 browser</canvas>
 </body>
+
 </html>
